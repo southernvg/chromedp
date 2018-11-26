@@ -433,14 +433,15 @@ func CallbackFunc(method string,f func(interface{})) ActionFunc {
 
 	 		tagert := h.(*TargetHandler)
 
+	 		tagert.Lock()
+	 		defer tagert.Unlock()
+
 			tagert.Callbacks[method]=f
 
 			//fmt.Println(h.(*cdp.TargetHandler).Callbacks)
 			return nil
-
-	 	})
-
-
+			
+	 	})	
 }
 
 var (

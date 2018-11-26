@@ -257,11 +257,11 @@ func (h *TargetHandler) processEvent(ctxt context.Context, msg *cdproto.Message)
 	switch d {
 	case "Page":
 		h.pageWaitGroup.Add(1)
-		go h.pageEvent(ctxt, ev)
+		go h.pageEvent(ctxt, msg, ev)
 
 	case "DOM":
 		h.domWaitGroup.Add(1)
-		go h.domEvent(ctxt, ev)
+		go h.domEvent(ctxt, msg, ev)
 
 	case "Network":
 		go h.networkEvent(ctxt, msg, ev)
@@ -510,12 +510,10 @@ func (h *TargetHandler) networkEvent(ctxt context.Context, msg *cdproto.Message,
 
 	//fmt.Println(msg.Method)
 
-	f ,ok := h.Callbacks[string(msg.Method)]
+	fn ,ok := h.Callbacks[string(msg.Method)]
 
 	if ok {
-
-		f(ev)
-
+		fn(ev)
 	}
 
 }
@@ -523,11 +521,23 @@ func (h *TargetHandler) networkEvent(ctxt context.Context, msg *cdproto.Message,
 	
 
 // pageEvent handles incoming page events.
-func (h *TargetHandler) pageEvent(ctxt context.Context, ev interface{}) {
+func (h *TargetHandler) pageEvent(ctxt context.Context, msg *cdproto.Message, ev interface{}) {
 	defer h.pageWaitGroup.Done()
 
 	var id cdp.FrameID
 	var op frameOp
+
+	h.Lock()
+
+	fn ,ok := h.Callbacks[string(msg.Method)]
+
+	h.Unlock()
+	
+	if ok {
+		fn(ev)
+	}
+
+	
 
 	switch e := ev.(type) {
 	case *page.EventFrameNavigated:
@@ -588,7 +598,7 @@ func (h *TargetHandler) pageEvent(ctxt context.Context, ev interface{}) {
 }
 
 // domEvent handles incoming DOM events.
-func (h *TargetHandler) domEvent(ctxt context.Context, ev interface{}) {
+func (h *TargetHandler) domEvent(ctxt context.Context, msg *cdproto.Message, ev interface{}) {
 	defer h.domWaitGroup.Done()
 
 	// wait current frame
@@ -596,6 +606,13 @@ func (h *TargetHandler) domEvent(ctxt context.Context, ev interface{}) {
 	if err != nil {
 		h.errf("could not process DOM event %s: %v", reflect.TypeOf(ev), err)
 		return
+	}
+
+	h.Lock()
+	fn ,ok := h.Callbacks[string(msg.Method)]
+	h.Unlock()
+	if ok {
+		fn(ev)
 	}
 
 	var id cdp.NodeID
