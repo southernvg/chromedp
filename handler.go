@@ -20,7 +20,7 @@ import (
 	"github.com/chromedp/cdproto/log"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
-
+	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp/client"
 )
 
@@ -60,6 +60,8 @@ type TargetHandler struct {
 	logf, debugf, errf func(string, ...interface{})
 
 	sync.RWMutex
+
+	Callbacks map[string]func(interface{})
 }
 
 // NewTargetHandler creates a new handler for the specified client target.
@@ -92,6 +94,7 @@ func (h *TargetHandler) Run(ctxt context.Context) error {
 	h.detached = make(chan *inspector.EventDetached)
 	h.pageWaitGroup = new(sync.WaitGroup)
 	h.domWaitGroup = new(sync.WaitGroup)
+	h.Callbacks = make(map[string]func(interface{}))
 	h.Unlock()
 
 	// run
@@ -101,7 +104,7 @@ func (h *TargetHandler) Run(ctxt context.Context) error {
 	for _, a := range []Action{
 		log.Enable(),
 		runtime.Enable(),
-		//network.Enable(),
+		network.Enable(),
 		inspector.Enable(),
 		page.Enable(),
 		dom.Enable(),
@@ -247,7 +250,7 @@ func (h *TargetHandler) processEvent(ctxt context.Context, msg *cdproto.Message)
 	}
 
 	d := msg.Method.Domain()
-	if d != "Page" && d != "DOM" {
+	if d != "Page" && d != "DOM" && d!="Network" {
 		return nil
 	}
 
@@ -259,6 +262,9 @@ func (h *TargetHandler) processEvent(ctxt context.Context, msg *cdproto.Message)
 	case "DOM":
 		h.domWaitGroup.Add(1)
 		go h.domEvent(ctxt, ev)
+
+	case "Network":
+		go h.networkEvent(ctxt, msg, ev)
 	}
 
 	return nil
@@ -500,6 +506,21 @@ func (h *TargetHandler) WaitNode(ctxt context.Context, f *cdp.Frame, id cdp.Node
 		}
 	}
 }
+func (h *TargetHandler) networkEvent(ctxt context.Context, msg *cdproto.Message, ev interface{}){
+
+	//fmt.Println(msg.Method)
+
+	f ,ok := h.Callbacks[string(msg.Method)]
+
+	if ok {
+
+		f(ev)
+
+	}
+
+}
+
+	
 
 // pageEvent handles incoming page events.
 func (h *TargetHandler) pageEvent(ctxt context.Context, ev interface{}) {

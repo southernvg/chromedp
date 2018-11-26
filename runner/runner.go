@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	//"log"
 
 	"github.com/chromedp/chromedp/client"
 )
@@ -86,7 +87,7 @@ func New(opts ...CommandLineOption) (*Runner, error) {
 
 	// add KillProcessGroup and ForceKill if no other cmd opts provided
 	if _, ok := cliOpts["cmd-opts"]; !ok {
-		for _, o := range []CommandLineOption{KillProcessGroup, ForceKill} {
+		for _, o := range []CommandLineOption{KillProcessGroup,ForceKill} {
 			if err = o(cliOpts); err != nil {
 				return nil, err
 			}
@@ -187,6 +188,7 @@ func (r *Runner) Start(ctxt context.Context, opts ...string) error {
 	// apply cmd opts
 	if cmdOpts, ok := r.opts["cmd-opts"]; ok {
 		for _, co := range cmdOpts.([]func(*exec.Cmd) error) {
+			fmt.Println("66666")
 			if err = co(r.cmd); err != nil {
 				return err
 			}
@@ -200,7 +202,9 @@ func (r *Runner) Start(ctxt context.Context, opts ...string) error {
 
 	// apply process opts
 	if processOpts, ok := r.opts["process-opts"]; ok {
+
 		for _, po := range processOpts.([]func(*os.Process) error) {
+
 			if err = po(r.cmd.Process); err != nil {
 				// TODO: do something better here, as we want to kill
 				// the child process, do cleanup, etc.
@@ -220,6 +224,7 @@ func (r *Runner) Shutdown(ctxt context.Context, opts ...client.Option) error {
 	cl := r.Client(opts...)
 
 	targets, err := cl.ListPageTargets(ctxt)
+	//fmt.Println("1")
 	if err != nil {
 		return err
 	}
@@ -249,6 +254,16 @@ func (r *Runner) Shutdown(ctxt context.Context, opts ...client.Option) error {
 		return r.cmd.Process.Signal(syscall.SIGTERM)
 	}
 
+	if  r.cmd!=nil &&r.cmd.Process!=nil{
+
+		//fmt.Println(*r.cmd.Process)
+
+		return r.cmd.Process.Signal(syscall.SIGTERM)
+
+	}
+
+	//fmt.Println("7777777777")
+
 	return nil
 }
 
@@ -272,7 +287,7 @@ func (r *Runner) Wait() error {
 		r.waiting = false
 		r.rw.Unlock()
 	}()
-
+	//log.Println("overrrrrr")
 	return r.cmd.Wait()
 }
 

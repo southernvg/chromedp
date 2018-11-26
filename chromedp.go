@@ -176,7 +176,7 @@ func (c *CDP) Shutdown(ctxt context.Context, opts ...client.Option) error {
 	if c.r != nil {
 		return c.r.Shutdown(ctxt, opts...)
 	}
-
+	//fmt.Println("1")
 	return nil
 }
 
@@ -427,8 +427,27 @@ func WithConsolef(f func(string, ...interface{})) Option {
 	}
 }
 
+func CallbackFunc(method string,f func(interface{})) ActionFunc {
+
+	 return ActionFunc(func(ctx context.Context, h cdp.Executor) error{
+
+	 		tagert := h.(*TargetHandler)
+
+			tagert.Callbacks[method]=f
+
+			//fmt.Println(h.(*cdp.TargetHandler).Callbacks)
+			return nil
+
+	 	})
+
+
+}
+
 var (
 	// defaultNewTargetTimeout is the default target timeout -- used by
 	// testing.
 	defaultNewTargetTimeout = DefaultNewTargetTimeout
 )
+
+
+

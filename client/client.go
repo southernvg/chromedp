@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	//"fmt"
 
 	"github.com/mailru/easyjson"
 )
@@ -82,6 +83,7 @@ func New(opts ...Option) *Client {
 // doReq executes a request.
 func (c *Client) doReq(ctxt context.Context, action string, v interface{}) error {
 	// create request
+	//fmt.Println(c.url+"/"+action)
 	req, err := http.NewRequest("GET", c.url+"/"+action, nil)
 	if err != nil {
 		return err
@@ -139,7 +141,7 @@ func (c *Client) ListTargets(ctxt context.Context) ([]Target, error) {
 // type.
 func (c *Client) ListTargetsWithType(ctxt context.Context, typ TargetType) ([]Target, error) {
 	var err error
-
+	//fmt.Println("1")
 	targets, err := c.ListTargets(ctxt)
 	if err != nil {
 		return nil, err
@@ -157,6 +159,7 @@ func (c *Client) ListTargetsWithType(ctxt context.Context, typ TargetType) ([]Ta
 
 // ListPageTargets lists the available Page targets.
 func (c *Client) ListPageTargets(ctxt context.Context) ([]Target, error) {
+	//fmt.Println("1")
 	return c.ListTargetsWithType(ctxt, Page)
 }
 
