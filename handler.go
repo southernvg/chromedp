@@ -14,7 +14,7 @@ import (
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
-	"github.com/chromedp/cdproto/css"
+	//"github.com/chromedp/cdproto/css"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/inspector"
 	"github.com/chromedp/cdproto/log"
@@ -22,6 +22,8 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp/client"
+	"github.com/chromedp/cdproto/target"
+	"github.com/fatih/color"
 )
 
 // TargetHandler manages a Chrome DevTools Protocol target.
@@ -61,7 +63,10 @@ type TargetHandler struct {
 
 	sync.RWMutex
 
-	Callbacks map[string]func(interface{})
+	Callbacks map[string]func(interface{},*TargetHandler)
+
+	//Frames []cdp.FrameID
+	CurFrameId cdp.FrameID
 }
 
 // NewTargetHandler creates a new handler for the specified client target.
@@ -94,7 +99,8 @@ func (h *TargetHandler) Run(ctxt context.Context) error {
 	h.detached = make(chan *inspector.EventDetached)
 	h.pageWaitGroup = new(sync.WaitGroup)
 	h.domWaitGroup = new(sync.WaitGroup)
-	h.Callbacks = make(map[string]func(interface{}))
+	h.Callbacks = make(map[string]func(interface{},*TargetHandler))
+	//h.Frames = make([]cdp.FrameID,0)
 	h.Unlock()
 
 	// run
@@ -107,8 +113,9 @@ func (h *TargetHandler) Run(ctxt context.Context) error {
 		network.Enable(),
 		inspector.Enable(),
 		page.Enable(),
-		dom.Enable(),
-		css.Enable(),
+		target.SetDiscoverTargets(true),
+		//dom.Enable(),
+		//css.Enable(),
 	} {
 		if err := a.Do(ctxt, h); err != nil {
 			return fmt.Errorf("unable to execute %s: %v", reflect.TypeOf(a), err)
@@ -122,7 +129,7 @@ func (h *TargetHandler) Run(ctxt context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to get resource tree: %v", err)
 	}
-
+	h.CurFrameId = tree.Frame.ID
 	h.frames[tree.Frame.ID] = tree.Frame
 	h.cur = tree.Frame
 
@@ -132,7 +139,7 @@ func (h *TargetHandler) Run(ctxt context.Context) error {
 
 	h.Unlock()
 
-	h.documentUpdated(ctxt)
+	//h.documentUpdated(ctxt)
 
 	return nil
 }
@@ -212,7 +219,7 @@ func (h *TargetHandler) read() (*cdproto.Message, error) {
 		return nil, err
 	}
 
-	h.debugf("-> %s", string(buf))
+	color.Yellow("-> %s", string(buf))
 
 	// unmarshal
 	msg := new(cdproto.Message)
@@ -250,9 +257,6 @@ func (h *TargetHandler) processEvent(ctxt context.Context, msg *cdproto.Message)
 	}
 
 	d := msg.Method.Domain()
-	if d != "Page" && d != "DOM" && d!="Network" {
-		return nil
-	}
 
 	switch d {
 	case "Page":
@@ -265,6 +269,8 @@ func (h *TargetHandler) processEvent(ctxt context.Context, msg *cdproto.Message)
 
 	case "Network":
 		go h.networkEvent(ctxt, msg, ev)
+	case "Target":
+		go h.targetEvent(ctxt, msg, ev)
 	}
 
 	return nil
@@ -321,7 +327,7 @@ func (h *TargetHandler) processCommand(cmd *cdproto.Message) error {
 		return err
 	}
 
-	h.debugf("<- %s", string(buf))
+	color.Green("<- %s", string(buf))
 
 	return h.conn.Write(buf)
 }
@@ -506,6 +512,18 @@ func (h *TargetHandler) WaitNode(ctxt context.Context, f *cdp.Frame, id cdp.Node
 		}
 	}
 }
+func (h *TargetHandler) targetEvent(ctxt context.Context,msg *cdproto.Message, ev interface{}){
+
+	fn ,ok := h.Callbacks[string(msg.Method)]
+	//h.Lock()
+	if ok {
+		fn(ev,h)
+	}
+	//h.Unlock()
+
+
+}
+
 func (h *TargetHandler) networkEvent(ctxt context.Context, msg *cdproto.Message, ev interface{}){
 
 	//fmt.Println(msg.Method)
@@ -513,7 +531,7 @@ func (h *TargetHandler) networkEvent(ctxt context.Context, msg *cdproto.Message,
 	fn ,ok := h.Callbacks[string(msg.Method)]
 
 	if ok {
-		fn(ev)
+		fn(ev,h)
 	}
 
 }
@@ -524,8 +542,8 @@ func (h *TargetHandler) networkEvent(ctxt context.Context, msg *cdproto.Message,
 func (h *TargetHandler) pageEvent(ctxt context.Context, msg *cdproto.Message, ev interface{}) {
 	defer h.pageWaitGroup.Done()
 
-	var id cdp.FrameID
-	var op frameOp
+	/*var id cdp.FrameID
+	var op frameOp*/
 
 	h.Lock()
 
@@ -534,38 +552,38 @@ func (h *TargetHandler) pageEvent(ctxt context.Context, msg *cdproto.Message, ev
 	h.Unlock()
 	
 	if ok {
-		fn(ev)
+		fn(ev,h)
 	}
 
 	
 
 	switch e := ev.(type) {
 	case *page.EventFrameNavigated:
-		h.Lock()
+		/*h.Lock()
 		h.frames[e.Frame.ID] = e.Frame
 		if h.cur != nil && h.cur.ID == e.Frame.ID {
 			h.cur = e.Frame
 		}
 		h.Unlock()
-		return
+		return*/
 
 	case *page.EventFrameAttached:
-		id, op = e.FrameID, frameAttached(e.ParentFrameID)
+		//id, op = e.FrameID, frameAttached(e.ParentFrameID)
 
 	case *page.EventFrameDetached:
-		id, op = e.FrameID, frameDetached
+		//id, op = e.FrameID, frameDetached
 
 	case *page.EventFrameStartedLoading:
-		id, op = e.FrameID, frameStartedLoading
+		//id, op = e.FrameID, frameStartedLoading
 
 	case *page.EventFrameStoppedLoading:
-		id, op = e.FrameID, frameStoppedLoading
+		//id, op = e.FrameID, frameStoppedLoading
 
 	case *page.EventFrameScheduledNavigation:
-		id, op = e.FrameID, frameScheduledNavigation
+		//id, op = e.FrameID, frameScheduledNavigation
 
 	case *page.EventFrameClearedScheduledNavigation:
-		id, op = e.FrameID, frameClearedScheduledNavigation
+		//id, op = e.FrameID, frameClearedScheduledNavigation
 
 		// ignored events
 	case *page.EventDomContentEventFired:
@@ -575,14 +593,15 @@ func (h *TargetHandler) pageEvent(ctxt context.Context, msg *cdproto.Message, ev
 	case *page.EventFrameResized:
 		return
 	case *page.EventLifecycleEvent:
+		_ = e
 		return
 
 	default:
-		h.errf("unhandled page event %s", reflect.TypeOf(ev))
+		//h.errf("unhandled page event %s", reflect.TypeOf(ev))
 		return
 	}
 
-	f, err := h.WaitFrame(ctxt, id)
+	/*f, err := h.WaitFrame(ctxt, id)
 	if err != nil {
 		h.errf("could not get frame %s: %v", id, err)
 		return
@@ -594,7 +613,7 @@ func (h *TargetHandler) pageEvent(ctxt context.Context, msg *cdproto.Message, ev
 	f.Lock()
 	defer f.Unlock()
 
-	op(f)
+	op(f)*/
 }
 
 // domEvent handles incoming DOM events.
@@ -612,7 +631,7 @@ func (h *TargetHandler) domEvent(ctxt context.Context, msg *cdproto.Message, ev 
 	fn ,ok := h.Callbacks[string(msg.Method)]
 	h.Unlock()
 	if ok {
-		fn(ev)
+		fn(ev,h)
 	}
 
 	var id cdp.NodeID

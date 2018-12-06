@@ -427,7 +427,7 @@ func WithConsolef(f func(string, ...interface{})) Option {
 	}
 }
 
-func CallbackFunc(method string,f func(interface{})) ActionFunc {
+func CallbackFunc(method string,f func( interface{},*TargetHandler)) ActionFunc {
 
 	 return ActionFunc(func(ctx context.Context, h cdp.Executor) error{
 
