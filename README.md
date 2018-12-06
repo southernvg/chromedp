@@ -3,7 +3,7 @@
 Install in the usual Go way:
 
 ```sh
-go get -u github.com/chromedp/chromedp
+go get -u github.com/m4p1e/chromedp
 ```
 
 ## Callback_Function For Events
@@ -181,5 +181,7 @@ func task(ctx context.Context)cdp.Tasks{
 	}
 }
 ``` 
+chromedp i wantted to rewrite its handler.go,i think its not flexible, its only does for itself CDP's Method .hope u guys like it :)
+
 
 
