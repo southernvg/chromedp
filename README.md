@@ -1,9 +1,3 @@
-# About chromedp [![Build Status][1]][2] [![Coverage Status][3]][4]
-
-Package chromedp is a faster, simpler way to drive browsers supporting the
-[Chrome DevTools Protocol][5] in Go using the without external dependencies
-(ie, Selenium, PhantomJS, etc).
-
 ## Installing
 
 Install in the usual Go way:
@@ -12,36 +6,180 @@ Install in the usual Go way:
 go get -u github.com/chromedp/chromedp
 ```
 
+## Callback_Function For Events
+
+There is no way for me to add callback_function for the events from chrome devtools,so i just add it and delete something  i think useless(Raw js should exec in the Page context),fixed something,if u have good question pls tell me !
+
+
 ## Examples
 
-Please see the [examples][6] project for more examples. Please refer to the
-[GoDoc API listing][7] for a summary of the API and Actions.
+CallbackFunc(method string,func(interface{},\*TargetHandler))
 
-## Resources
+u can add a event callbackfunc like that way
 
-* [chromedp: A New Way to Drive the Web][8] - GopherCon SG 2017 talk
-* [Chrome DevTools Protocol][5] - Chrome DevTools Protocol Domain documentation
-* [chromedp examples][6] - various `chromedp` examples
-* [`github.com/chromedp/cdproto`][9] - GoDoc listing for the CDP domains used by `chromedp`
-* [`github.com/chromedp/cdproto-gen`][10] - tool used to generate `cdproto`
-* [`github.com/chromedp/chromedp-proxy`][11] - a simple CDP proxy for logging CDP clients and browsers
+```go
+package main
 
-## TODO
+import(
+	cdp  "github.com/chromedp/chromedp"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/chromedp/runner"
+	"log"
+	"time"
+	"github.com/fatih/color"
+	"context"
 
-* Move timeouts to context (defaults)
-* Implement more query selector options (allow over riding context timeouts)
-* Contextual actions for "dry run" (or via an accumulator?)
-* Network loader / manager
-* Profiler
+)
 
-[1]: https://travis-ci.org/chromedp/chromedp.svg
-[2]: https://travis-ci.org/chromedp/chromedp
-[3]: https://coveralls.io/repos/chromedp/chromedp/badge.svg?branch=master&service=github
-[4]: https://coveralls.io/github/chromedp/chromedp?branch=master
-[5]: https://chromedevtools.github.io/devtools-protocol/
-[6]: https://github.com/chromedp/examples
-[7]: https://godoc.org/github.com/chromedp/chromedp
-[8]: https://www.youtube.com/watch?v=_7pWCg94sKw
-[9]: https://godoc.org/github.com/chromedp/cdproto
-[10]: https://github.com/chromedp/cdproto-gen
-[11]: https://github.com/chromedp/chromedp-proxy
+
+func main() {
+
+	var err error
+
+	// create context
+	ctxt, cancel:= context.WithCancel(context.Background())
+
+	defer cancel()
+
+	// create chrome instance cdp.WithLog(log.Printf)
+	c, err := cdp.New(ctxt,cdp.WithRunnerOptions(
+    runner.Flag("headless", true),
+    runner.Flag("disable-gpu", true),
+    runner.Flag("no-first-run", true),
+    runner.Flag("no-default-browser-check", true),
+    runner.Flag("no-sandbox",true),
+    runner.RemoteDebuggingPort(9222),
+))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = c.Run(ctxt, task(ctxt))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = c.Shutdown(ctxt)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = c.Wait()
+	
+	if err != nil {
+
+		log.Println(err)
+
+	}
+
+
+
+}
+
+func task(ctx context.Context)cdp.Tasks{
+	return cdp.Tasks{
+		cdp.CallbackFunc("Network.requestWillBeSent", func(param interface{},handler *cdp.TargetHandler){
+					data := param.(*network.EventRequestWillBeSent)
+					color.Red(data.Request.URL)				
+					}),
+		cdp.Navigate(`https://www.baidu.com`),
+		cdp.Sleep(10* time.Second),
+	}
+}
+```
+
+the handler \*cdp.Targethandler is for callbackfunc does next command
+
+```go
+package main
+
+import(
+	cdp  "github.com/chromedp/chromedp"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/chromedp/runner"
+	"log"
+	"time"
+	"github.com/fatih/color"
+	"context"
+
+)
+
+
+func main() {
+
+	var err error
+
+	// create context
+	ctxt, cancel:= context.WithCancel(context.Background())
+
+	defer cancel()
+
+	// create chrome instance cdp.WithLog(log.Printf)
+	c, err := cdp.New(ctxt,cdp.WithRunnerOptions(
+    runner.Flag("headless", true),
+    runner.Flag("disable-gpu", true),
+    runner.Flag("no-first-run", true),
+    runner.Flag("no-default-browser-check", true),
+    runner.Flag("no-sandbox",true),
+    runner.RemoteDebuggingPort(9222),
+))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = c.Run(ctxt, task(ctxt))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = c.Shutdown(ctxt)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = c.Wait()
+	
+	if err != nil {
+
+		log.Println(err)
+
+	}
+
+
+
+}
+
+func task(ctx context.Context)cdp.Tasks{
+	return cdp.Tasks{
+		cdp.CallbackFunc("Network.requestWillBeSent", func(param interface{},handler *cdp.TargetHandler){
+					data := param.(*network.EventRequestWillBeSent)
+					color.Red(data.Request.URL)				
+					}),
+		network.SetRequestInterception([]*network.RequestPattern{
+					&network.RequestPattern{
+					URLPattern:"*",ResourceType:"Document",
+					},
+				}),
+		cdp.CallbackFunc("Network.requestIntercepted", func(param interface{},handler *cdp.TargetHandler){
+						data := param.(*network.EventRequestIntercepted)
+				
+						json_byte,_:= data.MarshalJSON()
+
+						var out bytes.Buffer
+
+						 _ = json.Indent(&out, json_byte,"","\t")
+
+						fmt.Println(out.String())
+
+						network.ContinueInterceptedRequest(data.InterceptionID).WithHeaders(network.Headers{"key":"val",}).Do(ctx,handler)  //add hander for each dom request
+
+					}),
+		cdp.Navigate(`https://www.baidu.com`),
+		cdp.Sleep(10* time.Second),
+	}
+}
+``` 
+
+

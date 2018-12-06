@@ -188,7 +188,6 @@ func (r *Runner) Start(ctxt context.Context, opts ...string) error {
 	// apply cmd opts
 	if cmdOpts, ok := r.opts["cmd-opts"]; ok {
 		for _, co := range cmdOpts.([]func(*exec.Cmd) error) {
-			fmt.Println("66666")
 			if err = co(r.cmd); err != nil {
 				return err
 			}

@@ -23,7 +23,6 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp/client"
 	"github.com/chromedp/cdproto/target"
-	"github.com/fatih/color"
 )
 
 // TargetHandler manages a Chrome DevTools Protocol target.
@@ -218,8 +217,8 @@ func (h *TargetHandler) read() (*cdproto.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	color.Yellow("-> %s", string(buf))
+	
+	h.debugf("-> %s", string(buf))
 
 	// unmarshal
 	msg := new(cdproto.Message)
@@ -327,7 +326,7 @@ func (h *TargetHandler) processCommand(cmd *cdproto.Message) error {
 		return err
 	}
 
-	color.Green("<- %s", string(buf))
+	h.debugf("<- %s", string(buf))
 
 	return h.conn.Write(buf)
 }
